@@ -1,7 +1,7 @@
 # Claude Code statusline for Windows PowerShell
 # - Shows model / context % / 5h % / 7d %
 # - Highlights the model name in red when it is Fable
-# - Pops a Windows balloon notification once per threshold crossing
+# - Pops a Windows toast notification once per threshold crossing
 # No network access. No LLM calls. ASCII only on purpose (PS 5.1 misreads UTF-8 without BOM).
 param([string]$Notify)
 
@@ -11,16 +11,19 @@ $ExpensiveRe  = 'fable'                # model names to highlight (regex, case-i
 $Hysteresis   = 5                      # percent points a value must drop below the last threshold to re-arm
 $StateFile    = Join-Path $HOME '.claude\statusline-alert-state.json'
 
-# ---- notify mode: spawned by this script itself, shows a balloon and exits ----
+# ---- notify mode: spawned by this script itself, shows a toast and exits ----
 if ($Notify) {
-    Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName System.Drawing
-    $n = New-Object System.Windows.Forms.NotifyIcon
-    $n.Icon = [System.Drawing.SystemIcons]::Warning
-    $n.Visible = $true
-    $n.ShowBalloonTip(10000, 'Claude usage', $Notify, 'Warning')
-    Start-Sleep -Seconds 8
-    $n.Dispose()
+    # A real toast, not a NotifyIcon balloon: Windows removes a balloon from the notification
+    # center as soon as its tray icon is disposed, so it could not be reviewed later.
+    # The WinRT types below load only in Windows PowerShell 5.1 (not pwsh 7).
+    [void][Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
+    [void][Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
+    $aumid = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
+    $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
+    $xml.LoadXml('<toast><visual><binding template="ToastGeneric"><text>Claude usage</text><text>' +
+        [System.Security.SecurityElement]::Escape($Notify) + '</text></binding></visual></toast>')
+    $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
+    [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($aumid).Show($toast)
     exit
 }
 
