@@ -19,6 +19,7 @@ Claude Code のステータスラインに、モデル名と使用率を表示�
 
 ```
 windows/claude-statusline.ps1   Windows PowerShell 用
+windows/test-rearm.ps1          通知ロジックのシナリオテスト
 macos/                          追加予定
 ```
 
@@ -100,6 +101,24 @@ $ExpensiveRe  = 'fable|opus'
 
 入力が JSON として読めなかった場合は `[statusline: bad input]` と表示します。
 
+## テスト
+
+`windows/test-rearm.ps1` は、通知ロジック（閾値の判定と再武装）のシナリオテストです。`Test-Window`、`$Thresholds`、`$Hysteresis` を変更したら実行してください。
+
+```powershell
+powershell -NoProfile -File windows\test-rearm.ps1
+```
+
+全シナリオが通れば `PASSED` と表示し、終了コード 0 を返します。失敗したステップには `FAIL` が付き、終了コードは 1 になります。検証するシナリオは次の 3 つです。
+
+- 下振れ・枠のリセット・再通過（81→79→80→49→58→96→3→52 で通知 4 回）
+- ヒステリシスの境界（5 ポイントの下振れは無視、6 ポイントで通知せずに再武装）
+- 複数の閾値を一度に跨いだら、最も高い閾値だけ通知
+
+テストは本物のスクリプトを直接動かしません。一時コピーを作り、状態ファイルの場所を一時フォルダに、通知の起動をログ出力に差し替えて PowerShell 5.1 で実行します。実際の状態ファイルは変更されず、通知も出ません。差し替え対象の行が見つからないときは、実行を拒否して止まります。
+
+テスト対象をこのロジックに絞っているのは、状態を持つ唯一の部分で、実際に不具合が出た箇所だからです。通知の見え方や色分けは自動化せず、変更のたびに目視で確認します。CI も設定していません。
+
 ## 開発時の注意
 
-`windows/claude-statusline.ps1` は ASCII のみで書きます。PowerShell 5.1 は BOM なしの UTF-8 を ANSI（日本語環境では CP932）として読むため、非 ASCII 文字が混ざると文字化けや構文エラーの原因になります。コメントも英語で書いてください。
+`windows/claude-statusline.ps1` と `windows/test-rearm.ps1` は ASCII のみで書きます。PowerShell 5.1 は BOM なしの UTF-8 を ANSI（日本語環境では CP932）として読むため、非 ASCII 文字が混ざると文字化けや構文エラーの原因になります。コメントも英語で書いてください。
