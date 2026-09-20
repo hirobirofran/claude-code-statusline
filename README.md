@@ -1,6 +1,6 @@
 # claude-code-statusline
 
-Claude Code のステータスラインに、モデル名と使用率を表示するスクリプトです。使用率が閾値を跨ぐと、Windows のトースト通知を一度だけ出します。ネットワークアクセスも LLM 呼び出しも行いません。
+Claude Code のステータスラインに、モデル名と使用率を表示するスクリプトです。使用率が閾値を跨ぐと、OS の通知を一度だけ出します。ネットワークアクセスも LLM 呼び出しも行いません。Windows 版と macOS 版があります。
 
 ```
 [Sonnet 5] | ctx 42% | 5h 63% | 7d 18%
@@ -18,10 +18,13 @@ Claude Code のステータスラインに、モデル名と使用率を表示�
 ## 構成
 
 ```
-windows/claude-statusline.ps1   Windows PowerShell 用
-windows/test-rearm.ps1          通知ロジックのシナリオテスト
-macos/                          追加予定
+windows/claude-statusline.ps1   Windows 版（Windows PowerShell 5.1）
+windows/test-rearm.ps1          Windows 版の通知ロジックのシナリオテスト
+macos/claude-statusline.py      macOS 版（python3、標準ライブラリのみ）
+macos/test-rearm.py             macOS 版の通知ロジックのシナリオテスト
 ```
+
+2 つの実装は、表示形式・通知ロジック・状態ファイルの形式を揃えています。同じ入力を両方に与え、色の制御コードを含む出力と状態ファイルが一致することを確認済みです。
 
 ## インストール（Windows）
 
@@ -48,9 +51,28 @@ Unblock-File windows\claude-statusline.ps1
 
 `git clone` で取得したファイルには印が付かないため、この手順は不要です。
 
+## インストール（macOS）
+
+必要なのは `python3`（3.9 以上）だけです。Xcode Command Line Tools に含まれるので、`git` が使える Mac には入っています。追加のパッケージは要りません。
+
+Windows 版と同じく、`~/.claude/settings.json` からクローン先のスクリプトを直接指します。
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "python3 \"/Users/<ユーザー名>/<クローン先>/claude-code-statusline/macos/claude-statusline.py\""
+  }
+}
+```
+
+通知は「スクリプトエディタ」の名義で表示されます。通知が出ないときは、システム設定の「通知」で「スクリプトエディタ」を許可してください。
+
+macOS 版のロジックは Python 3.9 でテスト済みです。通知の表示と色は Mac 実機で未確認で、[Issue #1](https://github.com/hirobirofran/claude-code-statusline/issues/1) に確認項目を残しています。
+
 ## カスタマイズ
 
-設定はスクリプト冒頭の `# ---- settings ----` にまとまっています。編集内容は次の描画から反映されます。
+設定はスクリプト冒頭の `# ---- settings ----` にまとまっています。編集内容は次の描画から反映されます。以下の例は Windows 版の変数名です。macOS 版は同じ位置に `THRESHOLDS`、`HYSTERESIS`、`EXPENSIVE_RE` があります。
 
 ### 通知の閾値
 
@@ -66,7 +88,7 @@ $Thresholds   = @(50, 80, 95)          # percent
 $Hysteresis   = 5                      # percent points a value must drop below the last threshold to re-arm
 ```
 
-文字色の境目（50% で黄、80% で赤）は通知の閾値と連動しません。変える場合は `Paint` 関数内の数値を直接編集します。
+文字色の境目（50% で黄、80% で赤）は通知の閾値と連動しません。変える場合は `Paint` 関数（macOS 版は `paint`）内の数値を直接編集します。
 
 ### 強調するモデル名
 
@@ -91,9 +113,11 @@ $ExpensiveRe  = 'fable|opus'
 
 最後に通知した閾値は `~/.claude/statusline-alert-state.json` に保存します。通知を最初からやり直したいときは、このファイルを削除してください。
 
-通知は Windows 標準のトースト通知で、「Windows PowerShell」の名義で表示されます。通知センターに残るので、見逃してもあとから確認できます。トレイアイコンのバルーン通知を使わないのは、アイコンを破棄した時点で通知センターからも消えるためです。
+どちらの OS でも、通知は別プロセスで送ります。ステータスラインの描画は通知を待ちません。通知は通知センターに残るので、見逃してもあとから確認できます。
 
-通知は、スクリプトが自分自身を `-Notify` 付きの別プロセスで起動して送ります。ステータスラインの描画は通知を待ちません。送信には Windows PowerShell 5.1 が必要です。PowerShell 7 では、トーストに使う WinRT の型を読み込めません。
+Windows 版は標準のトースト通知を使い、「Windows PowerShell」の名義で表示されます。スクリプトが自分自身を `-Notify` 付きで起動して送ります。送信には Windows PowerShell 5.1 が必要です。PowerShell 7 では、トーストに使う WinRT の型を読み込めません。トレイアイコンのバルーン通知を使わないのは、アイコンを破棄した時点で通知センターからも消えるためです。
+
+macOS 版は `osascript` の `display notification` で送ります。メッセージは AppleScript のソースに埋め込まず、引数として渡します。
 
 ### rate_limits が無いとき
 
@@ -103,25 +127,35 @@ $ExpensiveRe  = 'fable|opus'
 
 ## テスト
 
-`windows/test-rearm.ps1` は、通知ロジック（閾値の判定と再武装）のシナリオテストです。`Test-Window`、`$Thresholds`、`$Hysteresis` を変更したら実行してください。
+通知ロジック（閾値の判定と再武装）のシナリオテストが、実装ごとにあります。Windows 版なら `Test-Window`、`$Thresholds`、`$Hysteresis` を、macOS 版なら `check_window`、`THRESHOLDS`、`HYSTERESIS` を変更したら実行してください。
 
 ```powershell
 powershell -NoProfile -File windows\test-rearm.ps1
 ```
 
-全シナリオが通れば `PASSED` と表示し、終了コード 0 を返します。失敗したステップには `FAIL` が付き、終了コードは 1 になります。検証するシナリオは次の 3 つです。
+```sh
+python3 macos/test-rearm.py
+```
+
+全シナリオが通れば `PASSED` と表示し、終了コード 0 を返します。失敗したステップには `FAIL` が付き、終了コードは 1 になります。シナリオと期待値は両方のテストで同一です。
 
 - 下振れ・枠のリセット・再通過（81→79→80→49→58→96→3→52 で通知 4 回）
 - ヒステリシスの境界（5 ポイントの下振れは無視、6 ポイントで通知せずに再武装）
 - 複数の閾値を一度に跨いだら、最も高い閾値だけ通知
 
-テストは本物のスクリプトを直接動かしません。一時コピーを作り、状態ファイルの場所を一時フォルダに、通知の起動をログ出力に差し替えて PowerShell 5.1 で実行します。実際の状態ファイルは変更されず、通知も出ません。差し替え対象の行が見つからないときは、実行を拒否して止まります。
+macOS 版のテストは、`rate_limits` が無い入力と不正な入力の表示も確認します。
+
+どちらのテストも、実際の状態ファイルを変更せず、通知も出しません。Windows 版は一時コピーを作り、状態ファイルの場所と通知の起動を差し替えて PowerShell 5.1 で実行します。差し替え対象の行が見つからないときは、実行を拒否して止まります。macOS 版はスクリプトをモジュールとして読み込み、`STATE_FILE` と `notify` を差し替えます。通知を送らないので、Mac 以外でも実行できます。
 
 テスト対象をこのロジックに絞っているのは、状態を持つ唯一の部分で、実際に不具合が出た箇所だからです。通知の見え方や色分けは自動化せず、変更のたびに目視で確認します。CI も設定していません。
 
 ## 開発時の注意
 
+通知ロジックを変えるときは、両方の実装を同時に直し、両方のテストを通してください。
+
 `windows/claude-statusline.ps1` と `windows/test-rearm.ps1` は ASCII のみで書きます。PowerShell 5.1 は BOM なしの UTF-8 を ANSI（日本語環境では CP932）として読むため、非 ASCII 文字が混ざると文字化けや構文エラーの原因になります。コメントも英語で書いてください。
+
+macOS 版は、Command Line Tools の `python3`（3.9）で動くように書きます。`match` 文や `X | Y` の型表記など、3.10 以降の構文は使いません。
 
 ## ライセンス
 
