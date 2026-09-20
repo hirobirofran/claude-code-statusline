@@ -122,3 +122,7 @@ powershell -NoProfile -File windows\test-rearm.ps1
 ## 開発時の注意
 
 `windows/claude-statusline.ps1` と `windows/test-rearm.ps1` は ASCII のみで書きます。PowerShell 5.1 は BOM なしの UTF-8 を ANSI（日本語環境では CP932）として読むため、非 ASCII 文字が混ざると文字化けや構文エラーの原因になります。コメントも英語で書いてください。
+
+## ライセンス
+
+[MIT License](LICENSE)
