@@ -8,6 +8,7 @@ param([string]$Notify)
 # ---- settings ----
 $Thresholds   = @(50, 80, 95)          # percent
 $ExpensiveRe  = 'fable'                # model names to highlight (regex, case-insensitive)
+$Hysteresis   = 5                      # percent points a value must drop below the last threshold to re-arm
 $StateFile    = Join-Path $HOME '.claude\statusline-alert-state.json'
 
 # ---- notify mode: spawned by this script itself, shows a balloon and exits ----
@@ -46,7 +47,11 @@ if (Test-Path $StateFile) {
 function Test-Window([string]$key, [string]$label, $pct) {
     if ($null -eq $pct) { return }
     $last = $script:state[$key]
-    if ($pct -lt $last) { $last = 0 }                       # window was reset
+    if ($pct -lt ($last - $Hysteresis)) {
+        # Real drop (window reset): re-arm silently to the highest threshold already passed.
+        # Small dips (stale snapshots from other terminals) are ignored.
+        $last = [int](($Thresholds | Where-Object { $_ -le $pct } | Measure-Object -Maximum).Maximum)
+    }
     $hit = ($Thresholds | Where-Object { $_ -le $pct -and $_ -gt $last } | Measure-Object -Maximum).Maximum
     if ($hit) {
         $last = [int]$hit
