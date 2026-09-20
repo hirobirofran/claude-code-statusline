@@ -1,0 +1,99 @@
+# claude-code-statusline
+
+Claude Code のステータスラインに、モデル名と使用率を表示するスクリプトです。使用率が閾値を跨ぐと、Windows のバルーン通知を一度だけ出します。ネットワークアクセスも LLM 呼び出しも行いません。
+
+```
+[Sonnet 5] | ctx 42% | 5h 63% | 7d 18%
+```
+
+## 表示内容
+
+- `[モデル名]`：`model.display_name`。高額モデルの正規表現に一致すると `[!! モデル名 !!]` と赤の太字になる
+- `ctx`：コンテキストウィンドウの使用率
+- `5h`：5時間枠のレート制限使用率
+- `7d`：7日枠のレート制限使用率
+
+使用率は 50% 以上で黄色、80% 以上で赤になります。
+
+## 構成
+
+```
+windows/claude-statusline.ps1   Windows PowerShell 用
+macos/                          追加予定
+```
+
+## インストール（Windows）
+
+スクリプトを `~/.claude/` にコピーします。
+
+```powershell
+Copy-Item windows\claude-statusline.ps1 $HOME\.claude\
+```
+
+`~/.claude/settings.json` に `statusLine` を追加します。パスは自分のユーザー名に合わせてください。
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "powershell -NoProfile -File \"C:/Users/<ユーザー名>/.claude/claude-statusline.ps1\""
+  }
+}
+```
+
+### Unblock-File の注意
+
+ブラウザ経由（ZIP や Raw の保存）で入手したファイルには、Windows が「インターネットから取得した」印を付けます。実行ポリシーが `RemoteSigned` だと、この印が付いたスクリプトは実行されず、ステータスラインに何も出ません。その場合はブロックを解除します。
+
+```powershell
+Unblock-File $HOME\.claude\claude-statusline.ps1
+```
+
+`git clone` で取得したファイルには印が付かないため、この手順は不要です。
+
+## カスタマイズ
+
+設定はスクリプト冒頭の `# ---- settings ----` にまとまっています。リポジトリ側を編集したら、`~/.claude/` へコピーし直してください。
+
+### 通知の閾値
+
+`$Thresholds` の配列を書き換えます。単位はパーセントです。
+
+```powershell
+$Thresholds   = @(50, 80, 95)          # percent
+```
+
+文字色の境目（50% で黄、80% で赤）は通知の閾値と連動しません。変える場合は `Paint` 関数内の数値を直接編集します。
+
+### 強調するモデル名
+
+`$ExpensiveRe` は `model.display_name` に対する正規表現で、大文字小文字を区別しません。複数のモデルを対象にするなら `|` でつなぎます。
+
+```powershell
+$ExpensiveRe  = 'fable|opus'
+```
+
+## 仕様
+
+### 通知
+
+通知の対象は `5h` と `7d` です。`ctx` は通知しません。
+
+- 使用率が閾値を跨いだら、一度だけ通知する。同じ閾値では再通知しない
+- 複数の閾値を一度に跨いだ場合は、最も高い閾値の通知を 1 回だけ出す
+- 使用率が最後に通知した閾値を下回ったら、枠がリセットされたとみなして再武装する
+- 再武装した時点でより低い閾値を超えていれば、その閾値で通知する
+
+最後に通知した閾値は `~/.claude/statusline-alert-state.json` に保存します。通知を最初からやり直したいときは、このファイルを削除してください。
+
+バルーン通知は、スクリプトが自分自身を `-Notify` 付きの別プロセスで起動して表示します。ステータスラインの描画は通知の表示を待ちません。
+
+### rate_limits が無いとき
+
+入力 JSON に `rate_limits` が無い場合、`5h` と `7d` は `--` と表示します。通知は行わず、状態ファイルも更新しません。`rate_limits` は Claude.ai のサブスクリプション利用時に、セッション最初の API 応答以降で渡されます。
+
+入力が JSON として読めなかった場合は `[statusline: bad input]` と表示します。
+
+## 開発時の注意
+
+`windows/claude-statusline.ps1` は ASCII のみで書きます。PowerShell 5.1 は BOM なしの UTF-8 を ANSI（日本語環境では CP932）として読むため、非 ASCII 文字が混ざると文字化けや構文エラーの原因になります。コメントも英語で書いてください。
