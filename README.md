@@ -24,36 +24,32 @@ macos/                          追加予定
 
 ## インストール（Windows）
 
-スクリプトを `~/.claude/` にコピーします。
-
-```powershell
-Copy-Item windows\claude-statusline.ps1 $HOME\.claude\
-```
-
-`~/.claude/settings.json` に `statusLine` を追加します。パスは自分のユーザー名に合わせてください。
+リポジトリをクローンし、`~/.claude/settings.json` の `statusLine` からクローン先のスクリプトを直接指します。`~/.claude/` へはコピーしません。コピーすると実ファイルとリポジトリの二重管理になるためです。
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "powershell -NoProfile -File \"C:/Users/<ユーザー名>/.claude/claude-statusline.ps1\""
+    "command": "powershell -NoProfile -File \"C:/<クローン先>/claude-code-statusline/windows/claude-statusline.ps1\""
   }
 }
 ```
+
+パスは自分のクローン先に合わせてください。この方式なら、`git pull` やスクリプトの編集がそのままステータスラインに反映されます。
 
 ### Unblock-File の注意
 
 ブラウザ経由（ZIP や Raw の保存）で入手したファイルには、Windows が「インターネットから取得した」印を付けます。実行ポリシーが `RemoteSigned` だと、この印が付いたスクリプトは実行されず、ステータスラインに何も出ません。その場合はブロックを解除します。
 
 ```powershell
-Unblock-File $HOME\.claude\claude-statusline.ps1
+Unblock-File windows\claude-statusline.ps1
 ```
 
 `git clone` で取得したファイルには印が付かないため、この手順は不要です。
 
 ## カスタマイズ
 
-設定はスクリプト冒頭の `# ---- settings ----` にまとまっています。リポジトリ側を編集したら、`~/.claude/` へコピーし直してください。
+設定はスクリプト冒頭の `# ---- settings ----` にまとまっています。編集内容は次の描画から反映されます。
 
 ### 通知の閾値
 
