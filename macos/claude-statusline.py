@@ -22,6 +22,8 @@ THRESHOLDS = (50, 80, 95)       # percent
 EXPENSIVE_RE = r'fable'         # model names to highlight (regex, case-insensitive)
 HYSTERESIS = 5                  # percent points a value must drop below the last threshold to re-arm
 STATE_FILE = os.path.join(os.path.expanduser('~'), '.claude', 'statusline-alert-state.json')
+NOTIFY_SOUND = 'default'        # sound played with the notification: 'default', a name from
+                                # /System/Library/Sounds (e.g. 'Glass'), or '' for silent
 
 ESC = '\x1b'
 
@@ -31,8 +33,11 @@ def notify(message):
 
     The message is passed as an argument, not spliced into the AppleScript source.
     macOS shows it under "Script Editor" and keeps it in Notification Center.
+    A silent notification is easy to miss, so a sound is on by default (NOTIFY_SOUND).
     """
-    script = 'on run argv\ndisplay notification (item 1 of argv) with title "Claude usage"\nend run'
+    sound = ' sound name "' + NOTIFY_SOUND + '"' if NOTIFY_SOUND else ''
+    script = ('on run argv\ndisplay notification (item 1 of argv) with title "Claude usage"'
+              + sound + '\nend run')
     try:
         subprocess.Popen(['osascript', '-e', script, message],
                          stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,

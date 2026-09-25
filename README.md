@@ -117,7 +117,7 @@ $ExpensiveRe  = 'fable|opus'
 
 Windows 版は標準のトースト通知を使い、「Windows PowerShell」の名義で表示されます。スクリプトが自分自身を `-Notify` 付きで起動して送ります。送信には Windows PowerShell 5.1 が必要です。PowerShell 7 では、トーストに使う WinRT の型を読み込めません。トレイアイコンのバルーン通知を使わないのは、アイコンを破棄した時点で通知センターからも消えるためです。
 
-macOS 版は `osascript` の `display notification` で送ります。メッセージは AppleScript のソースに埋め込まず、引数として渡します。
+macOS 版は `osascript` の `display notification` で送ります。メッセージは AppleScript のソースに埋め込まず、引数として渡します。無音だと気づけないので、通知音を鳴らします。音は `NOTIFY_SOUND` で変えられます。既定の `'default'` はシステムの通知音で、`/System/Library/Sounds` にある名前（`'Glass'` など）も指定できます。`''` にすると無音になります。
 
 ### rate_limits が無いとき
 
